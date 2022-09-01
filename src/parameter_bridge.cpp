@@ -248,6 +248,7 @@ int main(int argc, char * argv[])
   // and each item needs to be a dictionary with the following keys;
   // topic: the name of the topic to bridge (e.g. '/topic_name')
   // type: the type of the topic to bridge (e.g. 'pkgname/msg/MsgName')
+  // receiver: the ROS version of the bridge receiver (e.g. 'ROS1' or 'ROS2' or 'both', default: 'both')
   // queue_size: the queue size to use (default: 100)
   const char * topics_parameter_name = "topics";
   // the services parameters need to be arrays
@@ -277,26 +278,57 @@ int main(int argc, char * argv[])
     for (size_t i = 0; i < static_cast<size_t>(topics.size()); ++i) {
       std::string topic_name = static_cast<std::string>(topics[i]["topic"]);
       std::string type_name = static_cast<std::string>(topics[i]["type"]);
+      std::string receiver = static_cast<std::string>(topics[i]["receiver"]);
       size_t queue_size = static_cast<int>(topics[i]["queue_size"]);
       if (!queue_size) {
         queue_size = 100;
       }
-      printf(
+
+      RCLCPP_INFO(ros2_node->get_logger(),
         "Trying to create bidirectional bridge for topic '%s' "
         "with ROS 2 type '%s'\n",
         topic_name.c_str(), type_name.c_str());
 
       try {
         if (topics[i].hasMember("qos")) {
-          printf("Setting up QoS for '%s': ", topic_name.c_str());
+          RCLCPP_INFO(ros2_node->get_logger(), "Setting up QoS for '%s': ", topic_name.c_str());
           auto qos_settings = qos_from_params(topics[i]["qos"]);
-          printf("\n");
-          ros1_bridge::BridgeHandles handles = ros1_bridge::create_bidirectional_bridge(
-            ros1_node, ros2_node, "", type_name, topic_name, queue_size, qos_settings);
+
+          ros1_bridge::BridgeHandles handles;
+          if (receiver == "ROS1") {
+            RCLCPP_INFO(ros2_node->get_logger(), "create ROS2->ROS1 bridge for topic %s", topic_name.c_str());
+            handles.bridge2to1 = ros1_bridge::create_bridge_from_2_to_1(
+              ros2_node, ros1_node, type_name, topic_name, queue_size, "", topic_name, queue_size,
+              handles.bridge1to2.ros2_publisher);
+          }
+          else if (receiver == "ROS2") {
+            RCLCPP_INFO(ros2_node->get_logger(), "create ROS1->ROS2 bridge for topic %s", topic_name.c_str());
+            handles.bridge1to2 = ros1_bridge::create_bridge_from_1_to_2(
+              ros1_node, ros2_node, "", topic_name, queue_size, type_name, topic_name, qos_settings);
+          }
+          else {
+            handles = ros1_bridge::create_bidirectional_bridge(
+              ros1_node, ros2_node, "", type_name, topic_name, queue_size, qos_settings);
+          }
           all_handles.push_back(handles);
         } else {
-          ros1_bridge::BridgeHandles handles = ros1_bridge::create_bidirectional_bridge(
-            ros1_node, ros2_node, "", type_name, topic_name, queue_size);
+          // no QoS settings
+          ros1_bridge::BridgeHandles handles;
+          if (receiver == "ROS1") {
+            RCLCPP_INFO(ros2_node->get_logger(), "create ROS2->ROS1 bridge for topic %s", topic_name.c_str());
+            handles.bridge2to1 = ros1_bridge::create_bridge_from_2_to_1(
+              ros2_node, ros1_node, type_name, topic_name, queue_size, "", topic_name, queue_size,
+              handles.bridge1to2.ros2_publisher);
+          }
+          else if (receiver == "ROS2") {
+            RCLCPP_INFO(ros2_node->get_logger(), "create ROS1->ROS2 bridge for topic %s", topic_name.c_str());
+            handles.bridge1to2 = ros1_bridge::create_bridge_from_1_to_2(
+              ros1_node, ros2_node, "", topic_name, queue_size, type_name, topic_name, queue_size);
+          }
+          else {
+            handles = ros1_bridge::create_bidirectional_bridge(
+              ros1_node, ros2_node, "", type_name, topic_name, queue_size);
+          }
           all_handles.push_back(handles);
         }
       } catch (std::runtime_error & e) {

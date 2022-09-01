@@ -397,6 +397,7 @@ topics:
   -
     topic: /chatter  # Topic name on both ROS 1 and ROS 2
     type: std_msgs/msg/String  # Type of topic to bridge
+    receiver: ROS1  # ROS version of the topic receiver (ROS1, ROS2 or both; default: both)
     queue_size: 1  # Queue size
 services_2_to_1:
   -
