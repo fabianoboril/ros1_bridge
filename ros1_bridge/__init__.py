@@ -785,11 +785,11 @@ def determine_field_mapping(ros1_msg, ros2_msg, mapping_rules, msg_idx):
                     file=sys.stderr)
                 continue
             mapping.add_field_pair(ros1_selected_fields, ros2_selected_fields)
-        return mapping
 
     # apply name based mapping of fields
     ros1_field_missing_in_ros2 = False
 
+    ros1_fields_not_mapped = []
     for ros1_field in ros1_spec.parsed_fields():
         for ros2_member in ros2_spec.structure.members:
             if ros1_field.name.lower() == ros2_member.name:
@@ -797,9 +797,17 @@ def determine_field_mapping(ros1_msg, ros2_msg, mapping_rules, msg_idx):
                 update_ros1_field_information(ros1_field, ros1_msg.package_name)
                 mapping.add_field_pair(ros1_field, ros2_member)
                 break
-        else:
+
+        ros1_fields_mapped_to_a_ros2_member = [field[0].name
+                                               for field
+                                               in mapping.fields_1_to_2.keys()]
+        if ros1_field.name not in ros1_fields_mapped_to_a_ros2_member:
             # this allows fields to exist in ROS 1 but not in ROS 2
-            ros1_field_missing_in_ros2 = True
+            ros1_fields_not_mapped += [ros1_field]
+
+    ros1_field_missing_in_ros2 = any(ros1_fields_not_mapped)
+
+    mapping.ros1_field_missing_in_ros2 = ros1_field_missing_in_ros2
 
     if ros1_field_missing_in_ros2:
         # if some fields exist in ROS 1 but not in ROS 2
@@ -906,7 +914,8 @@ class Mapping:
         'ros2_msg',
         'fields_1_to_2',
         'fields_2_to_1',
-        'depends_on_ros2_messages'
+        'depends_on_ros2_messages',
+        'ros1_field_missing_in_ros2',
     ]
 
     def __init__(self, ros1_msg, ros2_msg):
@@ -915,6 +924,7 @@ class Mapping:
         self.fields_1_to_2 = OrderedDict()
         self.fields_2_to_1 = OrderedDict()
         self.depends_on_ros2_messages = set()
+        self.ros1_field_missing_in_ros2 = False
 
     def add_field_pair(self, ros1_fields, ros2_members):
         """
