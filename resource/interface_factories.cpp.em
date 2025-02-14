@@ -367,6 +367,19 @@ static void streamPrimitiveVector(ros::serialization::OStream & stream, const VE
   // copy data from std::vector/std::array into stream
   memcpy(stream.advance(data_len), &vec.front(), data_len);
 }
+// This version is overload for std::vector<bool>
+template<>
+void streamPrimitiveVector(ros::serialization::OStream & stream, const std::vector<bool>& vec_bool)
+{
+  const uint32_t step = sizeof(bool);
+  const uint32_t data_len = vec_bool.size() * sizeof(bool);
+  // element-wise copy because of vector<bool>
+  for(uint i = 0; i < vec_bool.size(); ++i)
+  {
+    *(stream.getData()+i*step) = vec_bool[i];
+  }
+  stream.advance(data_len);
+}
 
 // This version is for length
 template<typename VEC_PRIMITIVE_T>
@@ -384,7 +397,19 @@ static void streamPrimitiveVector(ros::serialization::IStream & stream, VEC_PRIM
   // copy data from stream into std::vector/std::array
   memcpy(&vec.front(), stream.advance(data_len), data_len);
 }
-
+// This version is overload for std::vector<bool>
+template<>
+void streamPrimitiveVector(ros::serialization::IStream & stream, std::vector<bool>& vec_bool)
+{
+ const uint32_t step = sizeof(bool);
+  const uint32_t data_len = vec_bool.size() * sizeof(bool);
+  // element-wise copy because of vector<bool>
+  for(uint i = 0; i < vec_bool.size(); ++i)
+  {
+    vec_bool[i] = *(stream.getData() + i*step);
+  }
+  stream.advance(data_len);
+}
 @[for m in mapped_msgs]@
 
 @[  if m.ros2_msg.package_name=="std_msgs" and m.ros2_msg.message_name=="Header"]
